@@ -1,7 +1,6 @@
 import User from "../model/user.model.js";
 import jwt from "jsonwebtoken";
 
-// Google Auth
 export const googleAuth = async (req, res) => {
   try {
     const { name, email, avatar } = req.body;
@@ -12,10 +11,8 @@ export const googleAuth = async (req, res) => {
       });
     }
 
-    // Check if user exists
     let user = await User.findOne({ email });
 
-    // Create new user if not found
     if (!user) {
       user = await User.create({
         name,
@@ -23,21 +20,18 @@ export const googleAuth = async (req, res) => {
         avatar,
       });
     } else {
-      // Update avatar if provided
       if (avatar && avatar !== user.avatar) {
         user.avatar = avatar;
         await user.save();
       }
     }
 
-    // Generate JWT token
     const token = jwt.sign(
       { id: user._id },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
 
-    // Set cookie
     res.cookie("token", token, {
       httpOnly: true,
       secure: true,
@@ -46,7 +40,7 @@ export const googleAuth = async (req, res) => {
     });
 
     return res.status(200).json({
-      ...(user.toObject ? user.toObject() : user),
+      user,
       token,
     });
   } catch (error) {
@@ -58,7 +52,6 @@ export const googleAuth = async (req, res) => {
   }
 };
 
-// Logout
 export const logout = (req, res) => {
   try {
     res.clearCookie("token", {

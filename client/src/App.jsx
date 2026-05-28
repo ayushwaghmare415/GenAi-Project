@@ -9,6 +9,8 @@ import LiveSite from './pages/LiveSite'
 import useGetCurrentUser from './hooks/useGetCurrentUser'
 import Pricing from './pages/Pricing'
 
+export const serverUrl = "https://genai-project-gt6z.onrender.com"
+
 function RedirectToEditor() {
   const { id } = useParams()
   return <Navigate to={`/editor/${id}`} replace />

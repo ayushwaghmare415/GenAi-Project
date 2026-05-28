@@ -312,13 +312,12 @@ JSON format:
       remainingCredits: user.credits,
     });
   } catch (error) {
-    console.error("Website generation error:", error);
+  console.error("Website generation error:", error);
 
-    return res.status(500).json({
-      message: error.message || "Website generation failed",
-    });
-  }
-};
+  return res.status(500).json({
+    message: error.message || "Website generation failed",
+  });
+}
 
 export const getWebsiteById = async (req, res) => {
     try {

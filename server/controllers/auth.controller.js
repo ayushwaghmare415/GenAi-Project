@@ -22,9 +22,8 @@ export const googleAuth = async (req, res) => {
         email,
         avatar,
       });
-    }
-    else {
-      // Update avatar if provided (keeps profile image in sync with Google)
+    } else {
+      // Update avatar if provided
       if (avatar && avatar !== user.avatar) {
         user.avatar = avatar;
         await user.save();
@@ -41,15 +40,18 @@ export const googleAuth = async (req, res) => {
     // Set cookie
     res.cookie("token", token, {
       httpOnly: true,
-      secure: true",
-      sameSite: "none", 
+      secure: true,
+      sameSite: "none",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    return res.status(200).json({ ...user.toObject ? user.toObject() : user, token });
-
+    return res.status(200).json({
+      ...(user.toObject ? user.toObject() : user),
+      token,
+    });
   } catch (error) {
     console.error("googleAuth error:", error);
+
     return res.status(500).json({
       message: `googleAuth error: ${error.message}`,
     });
@@ -61,7 +63,7 @@ export const logout = (req, res) => {
   try {
     res.clearCookie("token", {
       httpOnly: true,
-      secure: true",
+      secure: true,
       sameSite: "none",
     });
 
@@ -74,4 +76,3 @@ export const logout = (req, res) => {
     });
   }
 };
-

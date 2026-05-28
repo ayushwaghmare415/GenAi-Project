@@ -207,122 +207,117 @@ VERIFY:
 
 
 export const generateWebsite = async (req, res) => {
-    try {
-        let { prompt } = req.body;
-        if (!prompt) {
-            return res.status(400).json({ message: 'Prompt is required' });
-        }
-        
-        prompt = prompt.toString().trim();
-        if (!prompt) {
-            console.log('generateWebsite validation failed', { body: req.body, user: req.user });
-            return res.status(400).json({ message: 'Prompt cannot be empty' });
-        }
+  try {
+    let { prompt } = req.body;
 
-        // Use user from auth middleware (already verified)
-        const user = req.user;
-        if (!user) {
-            console.log('generateWebsite auth failed', { body: req.body, user: req.user });
-            return res.status(401).json({ message: 'User not authenticated' });
-        }
-
-        // Check if user has enough credits
-        const creditsRequired = 50;
-        if (!user.credits || user.credits < creditsRequired) {
-            console.log('generateWebsite credit failed', { userId: user._id, credits: user.credits });
-            return res.status(402).json({
-                message: `Insufficient credits. You have ${user.credits || 0} credits but need ${creditsRequired} to generate a website.`
-            });
-        }
-        const finalPrompt = masterPrompt.replace("{USER_PROMPT}", prompt);
-        let raw = "";
-        let parsed = null;
-        let lastError = null;
-
-        // Try up to 3 times to get valid JSON
-        for (let i = 0; i < 3; i++) {
-            try {
-                // Add stronger JSON enforcement on retries
-                const jsonPrompt = i === 0 
-                    ? finalPrompt 
-                    : i === 1
-                    ? finalPrompt + "\n\nIMPORTANT: Return ONLY valid raw JSON. No markdown, no extra text. Ensure all quotes in HTML are properly escaped with backslashes."
-                    : finalPrompt + "\n\nRETURN EXACT FORMAT:\n{\n  \"message\": \"string\",\n  \"code\": \"<html>...</html>\"\n}\n\nEnsure ALL quotes in code are escaped as \\\"";
-                
-                raw = await generateResponse(jsonPrompt);
-                
-                // Check if response is suspiciously short or long
-                if (raw.length < 100) {
-                    throw new Error(`Response too short: ${raw}`);
-                }
-                if (raw.length > 50000) {
-                    console.warn(`Response truncated from ${raw.length} to 50000 chars`);
-                    raw = raw.slice(0, 50000) + '}'; // Attempt to close JSON
-                }
-                
-                parsed = await extractJson(raw);
-
-                if (parsed && parsed.code) {
-                    console.log(`Successfully generated website on attempt ${i + 1}`);
-                    break;
-                } else {
-                    lastError = `Attempt ${i + 1}: Could not extract valid JSON with code field`;
-                    console.log(lastError);
-                }
-            } catch (error) {
-                lastError = `Attempt ${i + 1} error: ${error.message}`;
-                console.error(lastError);
-            }
-        }
-
-        if (!parsed || !parsed.code) {
-            const errorMsg = lastError || 'Unable to parse generated website code. AI service returned invalid format.';
-            console.error('Final error:', errorMsg);
-            console.log('Last raw response (first 1000 chars):', raw.slice(0, 1000));
-            return res.status(500).json({ message: errorMsg });
-        }
-
-        const title = prompt.slice(0, 60) || "Untitled Website";
-        const slug = await buildUniqueSlug(title);
-
-        const website = await Website.create({
-            user: user._id,
-            title,
-            slug,
-            latestCode: parsed.code,
-            conversation: [
-                {
-                    role: "ai",
-                    content: parsed.message || ""
-                },
-                {
-                    role: "user",
-                    content: prompt
-                }
-            ]
-        })
-
-        user.credits = user.credits - 50;
-        await user.save()
-
-        return res.status(201).json({
-          website,
-          remainingCredits: user.credits
-        })
-    } catch (error) {
-        console.error("Website generation error:", error);
-        
-        // Provide more specific error messages
-        if (error.message.includes("API Error") || error.message.includes("Unauthorized")) {
-            return res.status(500).json({ message: "AI service error. Please try again later." });
-        }
-        
-        if (error.message.includes("Cannot read") || error.message.includes("undefined")) {
-            return res.status(500).json({ message: "Failed to process AI response. Invalid format received." });
-        }
-        
-        return res.status(500).json({ message: `Error: ${error.message}` });
+    if (!prompt) {
+      return res.status(400).json({ message: "Prompt is required" });
     }
+
+    prompt = prompt.toString().trim();
+
+    if (!prompt) {
+      return res.status(400).json({ message: "Prompt cannot be empty" });
+    }
+
+    const user = req.user;
+
+    if (!user) {
+      return res.status(401).json({ message: "User not authenticated" });
+    }
+
+    const creditsRequired = 50;
+
+    if (!user.credits || user.credits < creditsRequired) {
+      return res.status(402).json({
+        message: `Insufficient credits. You have ${user.credits || 0} credits but need ${creditsRequired} to generate a website.`,
+      });
+    }
+
+    const finalPrompt = masterPrompt.replace("{USER_PROMPT}", prompt);
+
+    let raw = "";
+    let parsed = null;
+    let lastError = "";
+
+    for (let i = 0; i < 3; i++) {
+      try {
+        const jsonPrompt =
+          i === 0
+            ? finalPrompt
+            : `${finalPrompt}
+
+IMPORTANT:
+Return ONLY valid raw JSON.
+No markdown.
+No extra text.
+JSON format:
+{
+  "message": "Short confirmation",
+  "code": "<FULL HTML CODE>"
+}`;
+
+        raw = await generateResponse(jsonPrompt);
+
+        if (!raw || raw.length < 20) {
+          throw new Error(`AI response too short: ${raw}`);
+        }
+
+        parsed = await extractJson(raw);
+
+        if (parsed?.code) {
+          break;
+        }
+
+        lastError = `Attempt ${i + 1}: AI returned invalid JSON`;
+      } catch (error) {
+        lastError = error.message;
+        console.error(`Generate attempt ${i + 1} failed:`, error.message);
+      }
+    }
+
+    if (!parsed?.code) {
+      return res.status(500).json({
+        message: lastError || "AI returned invalid website code",
+        rawPreview: raw ? raw.slice(0, 300) : "",
+      });
+    }
+
+    const title = prompt.slice(0, 60) || "Untitled Website";
+    const slug = await buildUniqueSlug(title);
+
+    const website = await Website.create({
+      user: user._id,
+      title,
+      slug,
+      latestCode: parsed.code,
+      conversation: [
+        {
+          role: "user",
+          content: prompt,
+        },
+        {
+          role: "ai",
+          content: parsed.message || "Website generated successfully",
+        },
+      ],
+    });
+
+    user.credits = user.credits - creditsRequired;
+    await user.save();
+
+    return res.status(201).json({
+      message: parsed.message || "Website generated successfully",
+      website,
+      remainingCredits: user.credits,
+    });
+  } catch (error) {
+    console.error("Website generation error:", error);
+
+    return res.status(500).json({
+      message: error.message || "Website generation failed",
+    });
+  }
 };
 
 export const getWebsiteById = async (req, res) => {

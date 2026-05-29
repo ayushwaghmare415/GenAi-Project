@@ -2,47 +2,63 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+const openRouterUrl = process.env.OPENROUTER_URL || "https://openrouter.ai/api/v1/chat/completions";
+const openRouterKey = process.env.OPENROUTER_API_KEY || process.env.OPENROUTER_KEY;
+const openAIKey = process.env.OPENAI_API_KEY;
+const requestedMaxTokens = Number(process.env.OPENROUTER_MAX_TOKENS || process.env.OPENAI_MAX_TOKENS || 1500);
+const safeMaxTokens = Number.isFinite(requestedMaxTokens) && requestedMaxTokens > 0
+  ? Math.min(requestedMaxTokens, 1500)
+  : 1500;
+
+if (!openRouterKey && !openAIKey) {
+  throw new Error("OPENROUTER_API_KEY or OPENAI_API_KEY is not defined in environment variables");
+}
+
 export const generateResponse = async (prompt) => {
-  const apiKey = process.env.OPENROUTER_API_KEY?.trim();
+  const headers = {
+    "Content-Type": "application/json",
+  };
 
-  if (!apiKey) {
-    throw new Error("OPENROUTER_API_KEY is missing");
-  }
+  let requestUrl;
+  let body;
 
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-      "HTTP-Referer":
-        process.env.FRONTEND_URL || "https://genai-project-1-r3mq.onrender.com",
-      "X-Title": "GenWeb AI",
-    },
-    body: JSON.stringify({
-      model: "deepseek/deepseek-chat-v3-0324:free",
+  if (openAIKey && !openRouterKey) {
+    requestUrl = "https://api.openai.com/v1/chat/completions";
+    headers.Authorization = `Bearer ${openAIKey}`;
+    body = {
+      model: "gpt-3.5-turbo",
       messages: [
-        {
-          role: "system",
-          content: "Return only valid raw JSON. No markdown. No extra text.",
-        },
-        {
-          role: "user",
-          content: prompt,
-        },
+        { role: "system", content: "You must return ONLY valid raw JSON" },
+        { role: "user", content: prompt },
       ],
       temperature: 0.2,
-      max_tokens: 8000,
-    }),
-  });
-
-  const text = await response.text();
-
-  if (!response.ok) {
-    console.error("OpenRouter Error:", response.status, text);
-    throw new Error(`OpenRouter Error ${response.status}: ${text}`);
+      max_tokens: safeMaxTokens,
+    };
+  } else {
+    requestUrl = openRouterUrl;
+    headers.Authorization = `Bearer ${openRouterKey}`;
+    body = {
+      model: "deepseek/deepseek-chat",
+      messages: [
+        { role: "system", content: "You must return ONLY valid raw JSON" },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.2,
+      max_tokens: safeMaxTokens,
+    };
   }
 
-  const data = JSON.parse(text);
+  const res = await fetch(requestUrl, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  });
 
-  return data.choices?.[0]?.message?.content || "";
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`API Error: ${res.status} ${res.statusText} - ${errText}`);
+  }
+
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content || data.choices?.[0]?.text || JSON.stringify(data);
 };

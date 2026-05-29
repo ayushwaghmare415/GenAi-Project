@@ -5,6 +5,10 @@ dotenv.config();
 const openRouterUrl = process.env.OPENROUTER_URL || "https://openrouter.ai/api/v1/chat/completions";
 const openRouterKey = process.env.OPENROUTER_API_KEY || process.env.OPENROUTER_KEY;
 const openAIKey = process.env.OPENAI_API_KEY;
+const requestedMaxTokens = Number(process.env.OPENROUTER_MAX_TOKENS || process.env.OPENAI_MAX_TOKENS || 1500);
+const safeMaxTokens = Number.isFinite(requestedMaxTokens) && requestedMaxTokens > 0
+  ? Math.min(requestedMaxTokens, 1500)
+  : 1500;
 
 if (!openRouterKey && !openAIKey) {
   throw new Error("OPENROUTER_API_KEY or OPENAI_API_KEY is not defined in environment variables");
@@ -28,7 +32,7 @@ export const generateResponse = async (prompt) => {
         { role: "user", content: prompt },
       ],
       temperature: 0.2,
-      max_tokens: 8000,
+      max_tokens: safeMaxTokens,
     };
   } else {
     requestUrl = openRouterUrl;
@@ -40,7 +44,7 @@ export const generateResponse = async (prompt) => {
         { role: "user", content: prompt },
       ],
       temperature: 0.2,
-      max_tokens: 8000,
+      max_tokens: safeMaxTokens,
     };
   }
 

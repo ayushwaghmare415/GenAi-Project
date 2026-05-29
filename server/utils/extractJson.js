@@ -5,10 +5,10 @@ const extractJson = async (text) => {
 
     try {
         // First, try to clean and extract JSON
-        const cleaned = text
-            .replace(/```json/g, '')
-            .replace(/```/g, '')
-            .trim();
+        let cleaned = text
+            .replace(/^```[a-zA-Z]*\s*/gm, '')
+            .replace(/```$/gm, '')
+            .replace(/^\s+|\s+$/g, '');
 
         // Find the first { and last }
         const firstBracket = cleaned.indexOf('{');

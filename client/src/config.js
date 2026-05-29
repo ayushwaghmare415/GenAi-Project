@@ -1,2 +1,4 @@
-// Use 127.0.0.1 to avoid localhost HTTPS upgrade issues in some browsers
-export const serverUrl = 'http://127.0.0.1:8000';
+const localServerUrl = "http://127.0.0.1:8000";
+
+export const serverUrl =
+  import.meta.env.VITE_SERVER_URL || localServerUrl;

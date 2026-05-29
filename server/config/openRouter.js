@@ -1,20 +1,18 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-const openRouterUrl = "https://openrouter.ai/api/v1/chat/completions";
-
 export const generateResponse = async (prompt) => {
-  const openRouterKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = process.env.OPENROUTER_API_KEY;
 
-  if (!openRouterKey) {
-    throw new Error("OPENROUTER_API_KEY is missing in Render environment");
+  if (!apiKey) {
+    throw new Error("OPENROUTER_API_KEY is missing");
   }
 
-  const response = await fetch(openRouterUrl, {
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${openRouterKey}`,
+      Authorization: `Bearer ${apiKey}`,
       "HTTP-Referer": process.env.FRONTEND_URL || "https://genai-project-1-r3mq.onrender.com",
       "X-Title": "GenWeb AI",
     },

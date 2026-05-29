@@ -2,7 +2,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 export const generateResponse = async (prompt) => {
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = process.env.OPENROUTER_API_KEY?.trim();
 
   if (!apiKey) {
     throw new Error("OPENROUTER_API_KEY is missing");
@@ -17,16 +17,10 @@ export const generateResponse = async (prompt) => {
       "X-Title": "GenWeb AI",
     },
     body: JSON.stringify({
-      model: "deepseek/deepseek-chat",
+      model: "deepseek/deepseek-chat-v3-0324:free",
       messages: [
-        {
-          role: "system",
-          content: "Return only valid raw JSON. No markdown. No extra text.",
-        },
-        {
-          role: "user",
-          content: prompt,
-        },
+        { role: "system", content: "Return only valid raw JSON. No markdown." },
+        { role: "user", content: prompt },
       ],
       temperature: 0.2,
       max_tokens: 8000,
@@ -36,7 +30,6 @@ export const generateResponse = async (prompt) => {
   const text = await response.text();
 
   if (!response.ok) {
-    console.error("OpenRouter Error:", response.status, text);
     throw new Error(`OpenRouter Error ${response.status}: ${text}`);
   }
 
